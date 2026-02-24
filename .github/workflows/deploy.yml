@@ -10,29 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
-      # 3️⃣ Install & Build
-      - name: Install dependencies & build
-        run: |
-          npm install
-          npm run build
+      - name: Install dependencies
+        run: npm install
 
-      # 4️⃣ FTP Upload (FINAL BUILD ONLY)
+      - name: Build project
+        run: npm run build
+
       - name: FTP Deploy
         uses: samkirkland/ftp-deploy-action@v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
-          local-dir: build/
+          local-dir: .next/standalone/
           server-dir: /
           dangerous-clean-slate: true
