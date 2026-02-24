@@ -1,4 +1,4 @@
-name: Build & Deploy via FTP
+name: Build & Deploy (Static via FTP)
 
 on:
   push:
@@ -10,26 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build project
+      - name: Build static site
         run: npm run build
 
-      - name: FTP Deploy
+      - name: Deploy via FTP
         uses: samkirkland/ftp-deploy-action@v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
-          local-dir: .next/standalone/
+          local-dir: out/
           server-dir: /
-          dangerous-clean-slate: true
