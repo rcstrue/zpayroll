@@ -1,28 +1,38 @@
-name: Build & Deploy Static Site
+name: Build & Deploy via FTP
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4.3.5
+      # 1️⃣ Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # OPTIONAL: build step (skip if already static)
-      - name: Build
+      # 2️⃣ Setup Node
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # 3️⃣ Install & Build
+      - name: Install dependencies & build
         run: |
           npm install
           npm run build
 
-      - name: FTP Upload
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      # 4️⃣ FTP Upload (FINAL BUILD ONLY)
+      - name: FTP Deploy
+        uses: samkirkland/ftp-deploy-action@v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
           local-dir: build/
           server-dir: /
+          dangerous-clean-slate: true
