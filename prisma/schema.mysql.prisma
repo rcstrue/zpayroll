@@ -1,0 +1,760 @@
+// HRMS Database Schema for Manpower Suppliers
+// Indian Wage Code Compliant - MySQL Version
+
+generator client {
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "linux-musl-openssl-3.0", "linux-debian-openssl-3.0"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ORGANIZATION & USER MANAGEMENT
+// ============================================
+
+model Organization {
+  id                    String    @id @default(cuid())
+  name                  String
+  gstin                 String?   @db.VarChar(50)
+  pan                   String?   @db.VarChar(20)
+  cin                   String?   @db.VarChar(30)
+  registrationNumber    String?   @db.VarChar(50)
+  pfEstablishmentCode   String?   @db.VarChar(30)
+  esiEstablishmentCode  String?   @db.VarChar(30)
+  lwfRegistrationNo     String?   @db.VarChar(30)
+  professionalTaxRegNo  String?   @db.VarChar(30)
+  
+  address               String?   @db.Text
+  city                  String?   @db.VarChar(100)
+  state                 String?   @db.VarChar(100)
+  pincode               String?   @db.VarChar(10)
+  phone                 String?   @db.VarChar(20)
+  email                 String?   @db.VarChar(100)
+  website               String?   @db.VarChar(200)
+  
+  bankName              String?   @db.VarChar(100)
+  bankAccountNo         String?   @db.VarChar(30)
+  bankIfsc              String?   @db.VarChar(20)
+  bankBranch            String?   @db.VarChar(100)
+  
+  pfContributionRate    Float     @default(12.0)
+  esiContributionRate   Float     @default(3.25)
+  lwfEmployeeRate       Float     @default(0)
+  lwfEmployerRate       Float     @default(0)
+  
+  fiscalYearStart       Int       @default(4)
+  workingDaysMonth      Int       @default(26)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  employees             Employee[]
+  clients               Client[]
+  users                 User[]
+  salaryStructures      SalaryStructure[]
+  holidays              Holiday[]
+  leaveTypes            LeaveType[]
+  complianceSettings    ComplianceSetting[]
+  attendanceSettings    AttendanceSetting?
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique @db.VarChar(100)
+  password        String    @db.VarChar(255)
+  name            String    @db.VarChar(100)
+  role            String    @default("staff") @db.VarChar(20)
+  phone           String?   @db.VarChar(20)
+  isActive        Boolean   @default(true)
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([organizationId])
+}
+
+// ============================================
+// CLIENT / PRINCIPAL EMPLOYER MANAGEMENT
+// ============================================
+
+model Client {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  clientCode            String    @unique @db.VarChar(20)
+  companyName           String    @db.VarChar(200)
+  contactPerson         String?   @db.VarChar(100)
+  contactPhone          String?   @db.VarChar(20)
+  contactEmail          String?   @db.VarChar(100)
+  
+  gstin                 String?   @db.VarChar(50)
+  pan                   String?   @db.VarChar(20)
+  cin                   String?   @db.VarChar(30)
+  pfEstablishmentCode   String?   @db.VarChar(30)
+  esiEstablishmentCode  String?   @db.VarChar(30)
+  
+  billingAddress        String?   @db.Text
+  city                  String?   @db.VarChar(100)
+  state                 String?   @db.VarChar(100)
+  pincode               String?   @db.VarChar(10)
+  
+  contractStartDate     DateTime?
+  contractEndDate       DateTime?
+  contractValue         Float?
+  billingCycle          String    @default("monthly") @db.VarChar(20)
+  paymentTerms          Int       @default(30)
+  
+  serviceChargePercent  Float     @default(0)
+  serviceChargeGst      Float     @default(18.0)
+  
+  isActive              Boolean   @default(true)
+  notes                 String?   @db.Text
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  employeeDeployments   EmployeeDeployment[]
+  bills                 Bill[]
+  clientLocations       ClientLocation[]
+  
+  @@index([organizationId])
+  @@index([clientCode])
+}
+
+model ClientLocation {
+  id              String    @id @default(cuid())
+  clientId        String
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  locationName    String    @db.VarChar(200)
+  locationCode    String?   @db.VarChar(20)
+  address         String?   @db.Text
+  city            String?   @db.VarChar(100)
+  state           String?   @db.VarChar(100)
+  pincode         String?   @db.VarChar(10)
+  zone            String?   @db.VarChar(10)  // Zone A, B, C for minimum wages
+  isActive        Boolean   @default(true)
+  
+  employeeDeployments  EmployeeDeployment[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([clientId])
+}
+
+// ============================================
+// EMPLOYEE MANAGEMENT
+// ============================================
+
+model Employee {
+  id                String    @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  employeeCode      String    @unique @db.VarChar(20)
+  firstName         String    @db.VarChar(50)
+  lastName          String    @db.VarChar(50)
+  fatherName        String?   @db.VarChar(100)
+  motherName        String?   @db.VarChar(100)
+  dateOfBirth       DateTime?
+  gender            String?   @db.VarChar(10)
+  maritalStatus     String?   @db.VarChar(20)
+  bloodGroup        String?   @db.VarChar(5)
+  
+  phone             String?   @db.VarChar(20)
+  alternatePhone    String?   @db.VarChar(20)
+  email             String?   @db.VarChar(100)
+  permanentAddress  String?   @db.Text
+  permanentCity     String?   @db.VarChar(100)
+  permanentState    String?   @db.VarChar(100)
+  permanentPincode  String?   @db.VarChar(10)
+  currentAddress    String?   @db.Text
+  currentCity       String?   @db.VarChar(100)
+  currentState      String?   @db.VarChar(100)
+  currentPincode    String?   @db.VarChar(10)
+  
+  aadhaarNumber     String?   @db.VarChar(20)
+  panNumber         String?   @db.VarChar(15)
+  voterId           String?   @db.VarChar(30)
+  drivingLicense    String?   @db.VarChar(30)
+  passportNumber    String?   @db.VarChar(20)
+  
+  bankName          String?   @db.VarChar(100)
+  bankAccountNo     String?   @db.VarChar(30)
+  bankIfsc          String?   @db.VarChar(20)
+  bankBranch        String?   @db.VarChar(100)
+  
+  uanNumber         String?   @db.VarChar(20)
+  pfNumber          String?   @db.VarChar(30)
+  esiNumber         String?   @db.VarChar(30)
+  
+  dateOfJoining     DateTime?
+  dateOfExit        DateTime?
+  designation       String?   @db.VarChar(100)
+  department        String?   @db.VarChar(100)
+  skillLevel        String?   @db.VarChar(20)  // unskilled, semi-skilled, skilled, highly-skilled
+  employmentType    String    @default("contract") @db.VarChar(20)
+  status            String    @default("active") @db.VarChar(20)
+  
+  salaryStructureId String?
+  salaryStructure   SalaryStructure? @relation(fields: [salaryStructureId], references: [id], onDelete: SetNull)
+  
+  workingDays       Int       @default(26)
+  workingHours      Float     @default(8.0)
+  overtimeRate      Float     @default(2.0)
+  
+  deployments       EmployeeDeployment[]
+  documents         EmployeeDocument[]
+  attendance        Attendance[]
+  leaveBalances     LeaveBalance[]
+  leaveRequests     LeaveRequest[]
+  salaryRecords     SalaryRecord[]
+  pfRecords         PFRecord[]
+  esiRecords        ESIRecord[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([organizationId])
+  @@index([employeeCode])
+  @@index([status])
+}
+
+model EmployeeDocument {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  documentType    String    @db.VarChar(30)
+  documentName    String    @db.VarChar(200)
+  documentPath    String    @db.VarChar(500)
+  uploadedAt      DateTime  @default(now())
+  
+  @@index([employeeId])
+}
+
+model EmployeeDeployment {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  clientId        String
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  locationId      String?
+  location        ClientLocation? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  
+  deploymentCode  String    @unique @db.VarChar(20)
+  designation     String?   @db.VarChar(100)
+  department      String?   @db.VarChar(100)
+  
+  startDate       DateTime
+  endDate         DateTime?
+  
+  billingRate     Float
+  billingType     String    @default("monthly") @db.VarChar(20)
+  
+  actualSalary    Float
+  
+  isActive        Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([employeeId])
+  @@index([clientId])
+  @@index([locationId])
+}
+
+// ============================================
+// SALARY STRUCTURE
+// ============================================
+
+model SalaryStructure {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  structureName       String    @db.VarChar(100)
+  description         String?   @db.Text
+  
+  basicSalary         Float     @default(0)
+  dearnessAllowance   Float     @default(0)
+  houseRentAllowance  Float     @default(0)
+  conveyanceAllowance Float     @default(0)
+  medicalAllowance    Float     @default(0)
+  specialAllowance    Float     @default(0)
+  overtimeAllowance   Float     @default(0)
+  otherAllowances     Float     @default(0)
+  
+  professionalTax     Float     @default(0)
+  lwfEmployee         Float     @default(0)
+  lwfEmployer         Float     @default(0)
+  
+  pfApplicable        Boolean   @default(true)
+  esiApplicable       Boolean   @default(true)
+  ptApplicable        Boolean   @default(true)
+  lwfApplicable       Boolean   @default(false)
+  
+  bonusApplicable     Boolean   @default(true)
+  bonusPercent        Float     @default(8.33)
+  
+  gratuityApplicable  Boolean   @default(true)
+  
+  isActive            Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  employees           Employee[]
+  
+  @@index([organizationId])
+}
+
+// ============================================
+// ATTENDANCE MANAGEMENT
+// ============================================
+
+model AttendanceSetting {
+  id                  String    @id @default(cuid())
+  organizationId      String    @unique
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  shiftStartTime      String    @default("09:00") @db.VarChar(10)
+  shiftEndTime        String    @default("18:00") @db.VarChar(10)
+  graceMinutes        Int       @default(15)
+  halfDayHours        Float     @default(4.0)
+  overtimeThreshold   Float     @default(9.0)
+  
+  weekdaysOnly        Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Attendance {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  date            DateTime  @db.Date
+  shiftStart      String?   @db.VarChar(10)
+  shiftEnd        String?   @db.VarChar(10)
+  
+  status          String    @default("present") @db.VarChar(20)
+  workingHours    Float     @default(0)
+  overtimeHours   Float     @default(0)
+  
+  checkInLocation String?   @db.VarChar(200)
+  checkOutLocation String?  @db.VarChar(200)
+  
+  remarks         String?   @db.VarChar(500)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([employeeId, date])
+  @@index([employeeId])
+  @@index([date])
+}
+
+model Holiday {
+  id              String    @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  holidayName     String    @db.VarChar(100)
+  holidayDate     DateTime  @db.Date
+  holidayType     String    @default("national") @db.VarChar(20)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([organizationId])
+}
+
+// ============================================
+// LEAVE MANAGEMENT
+// ============================================
+
+model LeaveType {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  leaveTypeName       String    @db.VarChar(50)
+  leaveCode           String    @db.VarChar(10)
+  description         String?   @db.Text
+  
+  annualQuota         Int       @default(0)
+  carryForward        Boolean   @default(false)
+  maxCarryForward     Int       @default(0)
+  
+  isPaid              Boolean   @default(true)
+  encashable          Boolean   @default(false)
+  
+  isActive            Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  leaveBalances       LeaveBalance[]
+  
+  @@index([organizationId])
+}
+
+model LeaveBalance {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveTypeId     String
+  leaveType       LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  
+  year            Int
+  openingBalance  Float     @default(0)
+  accrued         Float     @default(0)
+  used            Float     @default(0)
+  closingBalance  Float     @default(0)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([employeeId, leaveTypeId, year])
+  @@index([employeeId])
+  @@index([leaveTypeId])
+}
+
+model LeaveRequest {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  leaveTypeId     String?
+  leaveType       String?   @db.VarChar(20)
+  
+  startDate       DateTime  @db.Date
+  endDate         DateTime  @db.Date
+  totalDays       Float
+  reason          String?   @db.Text
+  
+  status          String    @default("pending") @db.VarChar(20)
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?   @db.VarChar(500)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([employeeId])
+  @@index([status])
+}
+
+// ============================================
+// PAYROLL MANAGEMENT
+// ============================================
+
+model SalaryRecord {
+  id                      String    @id @default(cuid())
+  employeeId              String
+  employee                Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  month                   Int
+  year                    Int
+  
+  totalWorkingDays        Int
+  paidDays                Int
+  unpaidDays              Int
+  overtimeHours           Float
+  
+  basicSalary             Float     @default(0)
+  dearnessAllowance       Float     @default(0)
+  houseRentAllowance      Float     @default(0)
+  conveyanceAllowance     Float     @default(0)
+  medicalAllowance        Float     @default(0)
+  specialAllowance        Float     @default(0)
+  overtimeAmount          Float     @default(0)
+  otherAllowances         Float     @default(0)
+  grossEarnings           Float     @default(0)
+  
+  pfEmployee              Float     @default(0)
+  pfEmployer              Float     @default(0)
+  esiEmployee             Float     @default(0)
+  esiEmployer             Float     @default(0)
+  professionalTax         Float     @default(0)
+  lwfEmployee             Float     @default(0)
+  lwfEmployer             Float     @default(0)
+  tds                     Float     @default(0)
+  otherDeductions         Float     @default(0)
+  totalDeductions         Float     @default(0)
+  
+  netPay                  Float     @default(0)
+  
+  employerCost            Float     @default(0)
+  
+  status                  String    @default("draft") @db.VarChar(20)
+  
+  processedAt             DateTime?
+  paidAt                  DateTime?
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+  @@index([month, year])
+  @@index([status])
+}
+
+model Bill {
+  id                      String    @id @default(cuid())
+  clientId                String
+  client                  Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  billNumber              String    @unique @db.VarChar(30)
+  billDate                DateTime  @db.Date
+  periodStart             DateTime  @db.Date
+  periodEnd               DateTime  @db.Date
+  
+  totalManpowerCost       Float     @default(0)
+  serviceChargeAmount     Float     @default(0)
+  serviceChargeGst        Float     @default(0)
+  totalAmount             Float     @default(0)
+  
+  totalDeployments        Int       @default(0)
+  deploymentDetails       String?   @db.Text
+  
+  status                  String    @default("draft") @db.VarChar(20)
+  
+  paidAt                  DateTime?
+  notes                   String?   @db.Text
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@index([clientId])
+  @@index([status])
+}
+
+// ============================================
+// COMPLIANCE MANAGEMENT
+// ============================================
+
+model ComplianceSetting {
+  id                      String    @id @default(cuid())
+  organizationId          String
+  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  state                   String    @db.VarChar(50)
+  
+  pfApplicable            Boolean   @default(true)
+  pfWageCeiling           Float     @default(15000)
+  pfEmployeeRate          Float     @default(12.0)
+  pfEmployerRate          Float     @default(12.0)
+  epsRate                 Float     @default(8.33)
+  edliRate                Float     @default(0.5)
+  adminChargeRate         Float     @default(0.5)
+  
+  esiApplicable           Boolean   @default(true)
+  esiWageCeiling          Float     @default(21000)
+  esiEmployeeRate         Float     @default(0.75)
+  esiEmployerRate         Float     @default(3.25)
+  
+  ptApplicable            Boolean   @default(true)
+  ptMonthlyAmount         Float     @default(200)
+  
+  lwfApplicable           Boolean   @default(false)
+  lwfEmployeeAmount       Float     @default(0)
+  lwfEmployerAmount       Float     @default(0)
+  lwfPaymentFrequency     String    @default("yearly") @db.VarChar(20)
+  
+  minimumWageSkilled      Float     @default(0)
+  minimumWageSemiSkilled  Float     @default(0)
+  minimumWageUnskilled    Float     @default(0)
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@index([organizationId])
+}
+
+model PFRecord {
+  id                  String    @id @default(cuid())
+  employeeId          String
+  employee            Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  month               Int
+  year                Int
+  
+  wages               Float     @default(0)
+  epsWages            Float     @default(0)
+  edliWages           Float     @default(0)
+  
+  epfContribution     Float     @default(0)
+  epsContribution     Float     @default(0)
+  epfDiffContribution Float     @default(0)
+  edliContribution    Float     @default(0)
+  adminCharges        Float     @default(0)
+  
+  ncpDays             Int       @default(0)
+  
+  returnFiled         Boolean   @default(false)
+  returnFiledAt       DateTime?
+  challanNumber       String?   @db.VarChar(30)
+  challanDate         DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+  @@index([month, year])
+}
+
+model ESIRecord {
+  id                  String    @id @default(cuid())
+  employeeId          String
+  employee            Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  month               Int
+  year                Int
+  
+  wages               Float     @default(0)
+  employeeContribution Float    @default(0)
+  employerContribution Float    @default(0)
+  totalContribution   Float     @default(0)
+  
+  returnFiled         Boolean   @default(false)
+  returnFiledAt       DateTime?
+  challanNumber       String?   @db.VarChar(30)
+  challanDate         DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+  @@index([month, year])
+}
+
+model PTRecord {
+  id                  String    @id @default(cuid())
+  employeeId          String
+  
+  month               Int
+  year                Int
+  
+  grossSalary         Float     @default(0)
+  ptAmount            Float     @default(0)
+  
+  returnFiled         Boolean   @default(false)
+  returnFiledAt       DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+}
+
+model LWFRecord {
+  id                  String    @id @default(cuid())
+  employeeId          String
+  period              String    @db.VarChar(20)
+  year                Int
+  
+  employeeContribution Float    @default(0)
+  employerContribution Float    @default(0)
+  totalContribution   Float     @default(0)
+  
+  returnFiled         Boolean   @default(false)
+  returnFiledAt       DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@index([employeeId])
+  @@index([year])
+}
+
+// ============================================
+// INDIAN STATES & MINIMUM WAGES
+// ============================================
+
+model State {
+  id                  String    @id @default(cuid())
+  stateCode           String    @unique @db.VarChar(5)
+  stateName           String    @db.VarChar(100)
+  
+  zoneType            String    @default("A,B,C") @db.VarChar(20)
+  
+  lwfApplicable       Boolean   @default(false)
+  lwfEmployeeAmount   Float     @default(0)
+  lwfEmployerAmount   Float     @default(0)
+  lwfFrequency        String    @default("yearly") @db.VarChar(20)
+  
+  ptApplicable        Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  minimumWages        MinimumWage[]
+}
+
+model MinimumWage {
+  id                  String    @id @default(cuid())
+  stateId             String
+  state               State     @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  
+  effectiveFrom       DateTime  @db.Date
+  
+  zone                String    @db.VarChar(5)
+  
+  unskilledBasic      Float     @default(0)
+  unskilledVda        Float     @default(0)
+  unskilledTotal      Float     @default(0)
+  
+  semiSkilledBasic    Float     @default(0)
+  semiSkilledVda      Float     @default(0)
+  semiSkilledTotal    Float     @default(0)
+  
+  skilledBasic        Float     @default(0)
+  skilledVda          Float     @default(0)
+  skilledTotal        Float     @default(0)
+  
+  highlySkilledBasic  Float     @default(0)
+  highlySkilledVda    Float     @default(0)
+  highlySkilledTotal  Float     @default(0)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@index([stateId])
+  @@index([effectiveFrom])
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id              String    @id @default(cuid())
+  organizationId  String?
+  userId          String?
+  action          String    @db.VarChar(20)
+  module          String    @db.VarChar(50)
+  entityId        String?
+  entityType      String?   @db.VarChar(50)
+  oldValue        String?   @db.Text
+  newValue        String?   @db.Text
+  ipAddress       String?   @db.VarChar(50)
+  userAgent       String?   @db.VarChar(500)
+  createdAt       DateTime  @default(now())
+  
+  @@index([organizationId])
+  @@index([module])
+  @@index([createdAt])
+}

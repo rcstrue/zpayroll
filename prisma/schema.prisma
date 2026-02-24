@@ -1,0 +1,751 @@
+// HRMS Database Schema for Manpower Suppliers
+// Indian Wage Code Compliant - MySQL Compatible
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ORGANIZATION & USER MANAGEMENT
+// ============================================
+
+model Organization {
+  id                    String    @id @default(cuid())
+  name                  String
+  gstin                 String?   // GST Identification Number
+  pan                   String?   // PAN Number
+  cin                   String?   // Corporate Identity Number
+  registrationNumber    String?   // Labour License Number
+  pfEstablishmentCode   String?   // EPF Establishment Code
+  esiEstablishmentCode  String?   // ESI Establishment Code
+  lwfRegistrationNo     String?   // LWF Registration Number
+  professionalTaxRegNo  String?   // Professional Tax Registration Number
+  
+  address               String?
+  city                  String?
+  state                 String?
+  pincode               String?
+  phone                 String?
+  email                 String?
+  website               String?
+  
+  // Bank Details
+  bankName              String?
+  bankAccountNo         String?
+  bankIfsc              String?
+  bankBranch            String?
+  
+  // Compliance Settings
+  pfContributionRate    Float     @default(12.0)    // Employer PF Rate %
+  esiContributionRate   Float     @default(3.25)    // Employer ESI Rate %
+  lwfEmployeeRate       Float     @default(0)       // LWF Employee Contribution
+  lwfEmployerRate       Float     @default(0)       // LWF Employer Contribution
+  
+  fiscalYearStart       Int       @default(4)       // April = 4
+  workingDaysMonth      Int       @default(26)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  employees             Employee[]
+  clients               Client[]
+  users                 User[]
+  salaryStructures      SalaryStructure[]
+  holidays              Holiday[]
+  leaveTypes            LeaveType[]
+  complianceSettings    ComplianceSetting[]
+  attendanceSettings    AttendanceSetting?
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password        String
+  name            String
+  role            String    @default("staff") // admin, hr, accountant, staff
+  phone           String?
+  isActive        Boolean   @default(true)
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ============================================
+// CLIENT / PRINCIPAL EMPLOYER MANAGEMENT
+// ============================================
+
+model Client {
+  id                    String    @id @default(cuid())
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id])
+  
+  // Client Details
+  clientCode            String    @unique
+  companyName           String
+  contactPerson         String?
+  contactPhone          String?
+  contactEmail          String?
+  
+  // Statutory Details
+  gstin                 String?
+  pan                   String?
+  cin                   String?
+  pfEstablishmentCode   String?
+  esiEstablishmentCode  String?
+  
+  // Address
+  billingAddress        String?
+  city                  String?
+  state                 String?
+  pincode               String?
+  
+  // Contract Details
+  contractStartDate     DateTime?
+  contractEndDate       DateTime?
+  contractValue         Float?
+  billingCycle          String    @default("monthly") // monthly, quarterly
+  paymentTerms          Int       @default(30) // Days
+  
+  // Service Charges
+  serviceChargePercent  Float     @default(0)
+  serviceChargeGst      Float     @default(18.0)
+  
+  isActive              Boolean   @default(true)
+  notes                 String?
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  employeeDeployments   EmployeeDeployment[]
+  bills                 Bill[]
+  clientLocations       ClientLocation[]
+}
+
+model ClientLocation {
+  id              String    @id @default(cuid())
+  clientId        String
+  client          Client    @relation(fields: [clientId], references: [id])
+  
+  locationName    String
+  address         String?
+  city            String?
+  state           String?
+  pincode         String?
+  isActive        Boolean   @default(true)
+  
+  employeeDeployments  EmployeeDeployment[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ============================================
+// EMPLOYEE MANAGEMENT
+// ============================================
+
+model Employee {
+  id                String    @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  
+  // Personal Details
+  employeeCode      String    @unique
+  firstName         String
+  lastName          String
+  fatherName        String?
+  motherName        String?
+  dateOfBirth       DateTime?
+  gender            String?   // male, female, other
+  maritalStatus     String?   // single, married, divorced, widowed
+  bloodGroup        String?
+  
+  // Contact Details
+  phone             String?
+  alternatePhone    String?
+  email             String?
+  permanentAddress  String?
+  permanentCity     String?
+  permanentState    String?
+  permanentPincode  String?
+  currentAddress    String?
+  currentCity       String?
+  currentState      String?
+  currentPincode    String?
+  
+  // Identification Documents
+  aadhaarNumber     String?
+  panNumber         String?
+  voterId           String?
+  drivingLicense    String?
+  passportNumber    String?
+  
+  // Bank Details
+  bankName          String?
+  bankAccountNo     String?
+  bankIfsc          String?
+  bankBranch        String?
+  
+  // Statutory Details
+  uanNumber         String?   // EPF UAN
+  pfNumber          String?   // PF Account Number
+  esiNumber         String?   // ESI IP Number
+  
+  // Employment Details
+  dateOfJoining     DateTime?
+  dateOfExit        DateTime?
+  designation       String?
+  department        String?
+  employmentType    String    @default("contract") // permanent, contract, casual
+  status            String    @default("active") // active, inactive, terminated, resigned
+  
+  // Salary Details
+  salaryStructureId String?
+  salaryStructure   SalaryStructure? @relation(fields: [salaryStructureId], references: [id])
+  
+  // Work Details
+  workingDays       Int       @default(26)
+  workingHours      Float     @default(8.0)
+  overtimeRate      Float     @default(2.0) // Double rate
+  
+  // Deployment
+  deployments      EmployeeDeployment[]
+  
+  // Documents
+  documents         EmployeeDocument[]
+  
+  // Attendance & Leave
+  attendance        Attendance[]
+  leaveBalances     LeaveBalance[]
+  leaveRequests     LeaveRequest[]
+  
+  // Payroll
+  salaryRecords     SalaryRecord[]
+  
+  // Compliance
+  pfRecords         PFRecord[]
+  esiRecords        ESIRecord[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model EmployeeDocument {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  
+  documentType    String    // aadhaar, pan, photo, resume, experience, education
+  documentName    String
+  documentPath    String
+  uploadedAt      DateTime  @default(now())
+}
+
+model EmployeeDeployment {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  clientId        String
+  client          Client    @relation(fields: [clientId], references: [id])
+  locationId      String?
+  location        ClientLocation? @relation(fields: [locationId], references: [id])
+  
+  deploymentCode  String    @unique
+  designation     String?   // Role at client
+  department      String?
+  
+  startDate       DateTime
+  endDate         DateTime?
+  
+  // Billing Details
+  billingRate     Float     // Per day/month rate charged to client
+  billingType     String    @default("monthly") // daily, monthly, hourly
+  
+  // Salary paid at deployment
+  actualSalary    Float     // Salary paid to employee
+  
+  isActive        Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ============================================
+// SALARY STRUCTURE
+// ============================================
+
+model SalaryStructure {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  
+  structureName       String
+  description         String?
+  
+  // Earnings (Per Month)
+  basicSalary         Float     @default(0)
+  dearnessAllowance   Float     @default(0)  // DA
+  houseRentAllowance  Float     @default(0)  // HRA
+  conveyanceAllowance Float     @default(0)
+  medicalAllowance    Float     @default(0)
+  specialAllowance    Float     @default(0)
+  overtimeAllowance   Float     @default(0)
+  otherAllowances     Float     @default(0)
+  
+  // Deductions
+  professionalTax     Float     @default(0)  // Fixed PT amount
+  lwfEmployee         Float     @default(0)  // LWF Employee Share
+  lwfEmployer         Float     @default(0)  // LWF Employer Share
+  
+  // Statutory Settings
+  pfApplicable        Boolean   @default(true)
+  esiApplicable       Boolean   @default(true)
+  ptApplicable        Boolean   @default(true)
+  lwfApplicable       Boolean   @default(false)
+  
+  // Bonus Settings
+  bonusApplicable     Boolean   @default(true)
+  bonusPercent        Float     @default(8.33)  // Minimum statutory bonus
+  
+  // Gratuity Settings
+  gratuityApplicable  Boolean   @default(true)
+  
+  isActive            Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  employees           Employee[]
+}
+
+// ============================================
+// ATTENDANCE MANAGEMENT
+// ============================================
+
+model AttendanceSetting {
+  id                  String    @id @default(cuid())
+  organizationId      String    @unique
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  
+  shiftStartTime      String    @default("09:00")
+  shiftEndTime        String    @default("18:00")
+  graceMinutes        Int       @default(15)
+  halfDayHours        Float     @default(4.0)
+  overtimeThreshold   Float     @default(9.0)  // Hours after which OT starts
+  
+  weekdaysOnly        Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Attendance {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  
+  date            DateTime
+  shiftStart      String?   // Actual in time
+  shiftEnd        String?   // Actual out time
+  
+  status          String    @default("present") // present, absent, half-day, holiday, weekly-off
+  workingHours    Float     @default(0)
+  overtimeHours   Float     @default(0)
+  
+  // Location tracking
+  checkInLocation String?
+  checkOutLocation String?
+  
+  remarks         String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([employeeId, date])
+}
+
+model Holiday {
+  id              String    @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  
+  holidayName     String
+  holidayDate     DateTime
+  holidayType     String    @default("national") // national, state, optional
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ============================================
+// LEAVE MANAGEMENT
+// ============================================
+
+model LeaveType {
+  id                  String    @id @default(cuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  
+  leaveTypeName       String
+  leaveCode           String
+  description         String?
+  
+  annualQuota         Int       @default(0)
+  carryForward        Boolean   @default(false)
+  maxCarryForward     Int       @default(0)
+  
+  isPaid              Boolean   @default(true)
+  encashable          Boolean   @default(false)
+  
+  isActive            Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  leaveBalances       LeaveBalance[]
+}
+
+model LeaveBalance {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  leaveTypeId     String
+  leaveType       LeaveType @relation(fields: [leaveTypeId], references: [id])
+  
+  year            Int
+  openingBalance  Float     @default(0)
+  accrued         Float     @default(0)
+  used            Float     @default(0)
+  closingBalance  Float     @default(0)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([employeeId, leaveTypeId, year])
+}
+
+model LeaveRequest {
+  id              String    @id @default(cuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  
+  leaveTypeId     String?   // Can be null for unpaid leave
+  leaveType       String?   // casual, sick, earned, unpaid
+  
+  startDate       DateTime
+  endDate         DateTime
+  totalDays       Float
+  reason          String?
+  
+  status          String    @default("pending") // pending, approved, rejected
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ============================================
+// PAYROLL MANAGEMENT
+// ============================================
+
+model SalaryRecord {
+  id                      String    @id @default(cuid())
+  employeeId              String
+  employee                Employee  @relation(fields: [employeeId], references: [id])
+  
+  month                   Int       // 1-12
+  year                    Int
+  
+  // Days
+  totalWorkingDays        Int
+  paidDays                Int
+  unpaidDays              Int
+  overtimeHours           Float
+  
+  // Earnings
+  basicSalary             Float     @default(0)
+  dearnessAllowance       Float     @default(0)
+  houseRentAllowance      Float     @default(0)
+  conveyanceAllowance     Float     @default(0)
+  medicalAllowance        Float     @default(0)
+  specialAllowance        Float     @default(0)
+  overtimeAmount          Float     @default(0)
+  otherAllowances         Float     @default(0)
+  grossEarnings           Float     @default(0)
+  
+  // Deductions
+  pfEmployee              Float     @default(0)    // Employee PF contribution
+  pfEmployer              Float     @default(0)    // Employer PF contribution
+  esiEmployee             Float     @default(0)    // Employee ESI contribution
+  esiEmployer             Float     @default(0)    // Employer ESI contribution
+  professionalTax         Float     @default(0)
+  lwfEmployee             Float     @default(0)
+  lwfEmployer             Float     @default(0)
+  tds                     Float     @default(0)
+  otherDeductions         Float     @default(0)
+  totalDeductions         Float     @default(0)
+  
+  // Net Pay
+  netPay                  Float     @default(0)
+  
+  // Employer Cost
+  employerCost            Float     @default(0)    // Total cost including employer contributions
+  
+  status                  String    @default("draft") // draft, processed, paid
+  
+  processedAt             DateTime?
+  paidAt                  DateTime?
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  @@unique([employeeId, month, year])
+}
+
+model Bill {
+  id                      String    @id @default(cuid())
+  clientId                String
+  client                  Client    @relation(fields: [clientId], references: [id])
+  
+  billNumber              String    @unique
+  billDate                DateTime
+  periodStart             DateTime
+  periodEnd               DateTime
+  
+  // Billing Details
+  totalManpowerCost       Float     @default(0)
+  serviceChargeAmount     Float     @default(0)
+  serviceChargeGst        Float     @default(0)
+  totalAmount             Float     @default(0)
+  
+  // Deployment Summary
+  totalDeployments        Int       @default(0)
+  deploymentDetails       String?   // JSON string of deployment summary
+  
+  status                  String    @default("draft") // draft, sent, paid
+  
+  paidAt                  DateTime?
+  notes                   String?
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+// ============================================
+// COMPLIANCE MANAGEMENT
+// ============================================
+
+model ComplianceSetting {
+  id                      String    @id @default(cuid())
+  organizationId          String
+  organization            Organization @relation(fields: [organizationId], references: [id])
+  
+  state                   String    // For state-specific compliance
+  
+  // EPF Settings
+  pfApplicable            Boolean   @default(true)
+  pfWageCeiling           Float     @default(15000)    // EPF wage ceiling
+  pfEmployeeRate          Float     @default(12.0)     // Employee contribution %
+  pfEmployerRate          Float     @default(12.0)     // Employer contribution %
+  epsRate                 Float     @default(8.33)     // Pension scheme rate
+  edliRate                Float     @default(0.5)      // EDLI rate
+  adminChargeRate         Float     @default(0.5)      // EPF admin charges
+  
+  // ESI Settings
+  esiApplicable           Boolean   @default(true)
+  esiWageCeiling          Float     @default(21000)    // ESI wage ceiling
+  esiEmployeeRate         Float     @default(0.75)     // Employee contribution %
+  esiEmployerRate         Float     @default(3.25)     // Employer contribution %
+  
+  // Professional Tax Settings
+  ptApplicable            Boolean   @default(true)
+  ptMonthlyAmount         Float     @default(200)      // Standard PT amount
+  
+  // LWF Settings
+  lwfApplicable           Boolean   @default(false)
+  lwfEmployeeAmount       Float     @default(0)
+  lwfEmployerAmount       Float     @default(0)
+  lwfPaymentFrequency     String    @default("yearly") // monthly, half-yearly, yearly
+  
+  // Minimum Wages
+  minimumWageSkilled      Float     @default(0)
+  minimumWageSemiSkilled  Float     @default(0)
+  minimumWageUnskilled    Float     @default(0)
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+model PFRecord {
+  id                  String    @id @default(cuid())
+  employeeId          String
+  employee            Employee  @relation(fields: [employeeId], references: [id])
+  
+  month               Int
+  year                Int
+  
+  wages               Float     @default(0)   // EPF wages
+  epsWages            Float     @default(0)   // EPS wages
+  edliWages           Float     @default(0)   // EDLI wages
+  
+  epfContribution     Float     @default(0)   // Employee contribution
+  epsContribution     Float     @default(0)   // Employer pension contribution
+  epfDiffContribution Float     @default(0)   // Employer EPF difference
+  edliContribution    Float     @default(0)   // EDLI contribution
+  adminCharges        Float     @default(0)   // Admin charges
+  
+  ncpDays             Int       @default(0)   // Non-contributory days
+  
+  // Return filing
+  returnFiled         Boolean   @default(false)
+  returnFiledAt       DateTime?
+  challanNumber       String?
+  challanDate         DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@unique([employeeId, month, year])
+}
+
+model ESIRecord {
+  id                  String    @id @default(cuid())
+  employeeId          String
+  employee            Employee  @relation(fields: [employeeId], references: [id])
+  
+  month               Int
+  year                Int
+  
+  wages               Float     @default(0)   // ESI wages
+  employeeContribution Float    @default(0)
+  employerContribution Float    @default(0)
+  totalContribution   Float     @default(0)
+  
+  // Return filing
+  returnFiled         Boolean   @default(false)
+  returnFiledAt       DateTime?
+  challanNumber       String?
+  challanDate         DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@unique([employeeId, month, year])
+}
+
+model PTRecord {
+  id                  String    @id @default(cuid())
+  employeeId          String
+  month               Int
+  year                Int
+  
+  grossSalary         Float     @default(0)
+  ptAmount            Float     @default(0)
+  
+  // Return filing
+  returnFiled         Boolean   @default(false)
+  returnFiledAt       DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@unique([employeeId, month, year])
+}
+
+model LWFRecord {
+  id                  String    @id @default(cuid())
+  employeeId          String
+  period              String    // month-year or half-year or year
+  year                Int
+  
+  employeeContribution Float    @default(0)
+  employerContribution Float    @default(0)
+  totalContribution   Float     @default(0)
+  
+  returnFiled         Boolean   @default(false)
+  returnFiledAt       DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+// ============================================
+// INDIAN STATES & MINIMUM WAGES
+// ============================================
+
+model State {
+  id                  String    @id @default(cuid())
+  stateCode           String    @unique
+  stateName           String
+  
+  // Minimum Wages (will be updated as per notifications)
+  zoneType            String    @default("A,B,C") // Zone classification
+  
+  lwfApplicable       Boolean   @default(false)
+  lwfEmployeeAmount   Float     @default(0)
+  lwfEmployerAmount   Float     @default(0)
+  lwfFrequency        String    @default("yearly")
+  
+  ptApplicable        Boolean   @default(true)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  minimumWages        MinimumWage[]
+}
+
+model MinimumWage {
+  id                  String    @id @default(cuid())
+  stateId             String
+  state               State     @relation(fields: [stateId], references: [id])
+  
+  effectiveFrom       DateTime
+  
+  // Zone-wise wages (per day)
+  zone                String    // A, B, C etc.
+  
+  unskilledBasic      Float     @default(0)
+  unskilledVda        Float     @default(0)   // Variable Dearness Allowance
+  unskilledTotal      Float     @default(0)
+  
+  semiSkilledBasic    Float     @default(0)
+  semiSkilledVda      Float     @default(0)
+  semiSkilledTotal    Float     @default(0)
+  
+  skilledBasic        Float     @default(0)
+  skilledVda          Float     @default(0)
+  skilledTotal        Float     @default(0)
+  
+  highlySkilledBasic  Float     @default(0)
+  highlySkilledVda    Float     @default(0)
+  highlySkilledTotal  Float     @default(0)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id              String    @id @default(cuid())
+  organizationId  String?
+  userId          String?
+  action          String    // create, update, delete
+  module          String    // employee, payroll, compliance etc.
+  entityId        String?
+  entityType      String?
+  oldValue        String?   // JSON
+  newValue        String?   // JSON
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime  @default(now())
+}
