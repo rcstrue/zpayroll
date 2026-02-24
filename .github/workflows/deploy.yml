@@ -1,0 +1,28 @@
+name: Build & Deploy Static Site
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # OPTIONAL: build step (skip if already static)
+      - name: Build
+        run: |
+          npm install
+          npm run build
+
+      - name: FTP Upload
+        uses: SamKirkland/FTP-Deploy-Action@v4
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          local-dir: build/
+          server-dir: public_html/
